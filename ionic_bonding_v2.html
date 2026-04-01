@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>이온 결합 시뮬레이터</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    background: #f0f4fa;
+    min-height: 100vh;
+    padding: 1.5rem 1rem 3rem;
+  }
+  h1 {
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    color: #1a2a4a;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    text-align: center;
+    font-size: 13px;
+    color: #7a8aaa;
+    margin-bottom: 1.5rem;
+  }
+
+  /* 주기율표 */
+  .table-section {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    padding: 1.2rem 1rem;
+    max-width: 860px;
+    margin: 0 auto 1.2rem;
+  }
+  .table-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #3a4a6a;
+    margin-bottom: 10px;
+  }
+  .periodic-grid {
+    display: grid;
+    grid-template-columns: repeat(18, 1fr);
+    gap: 3px;
+  }
+  .el-cell {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    transition: all 0.15s;
+    min-width: 0;
+    padding: 2px 1px;
+    position: relative;
+  }
+  .el-cell .el-num {
+    font-size: 8px;
+    color: inherit;
+    opacity: 0.7;
+    line-height: 1;
+  }
+  .el-cell .el-sym {
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .el-cell.metal {
+    background: #fff3e0;
+    border-color: #ffcc80;
+    color: #7a3500;
+  }
+  .el-cell.nonmetal {
+    background: #e3f2fd;
+    border-color: #90caf9;
+    color: #0d47a1;
+  }
+  .el-cell.noble {
+    background: #f3e5f5;
+    border-color: #ce93d8;
+    color: #6a1b9a;
+  }
+  .el-cell.empty { background: transparent; border-color: transparent; cursor: default; }
+  .el-cell.disabled { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
+  .el-cell.selected-metal {
+    background: #e65100 !important;
+    border-color: #bf360c !important;
+    color: #fff !important;
+    box-shadow: 0 0 0 2px #ff8a65;
+  }
+  .el-cell.selected-nonmetal {
+    background: #1565c0 !important;
+    border-color: #0d47a1 !important;
+    color: #fff !important;
+    box-shadow: 0 0 0 2px #64b5f6;
+  }
+  .el-cell.metal:hover:not(.disabled):not(.selected-metal) {
+    background: #ffe0b2;
+    border-color: #e65100;
+    transform: scale(1.08);
+    z-index: 2;
+  }
+  .el-cell.nonmetal:hover:not(.disabled):not(.selected-nonmetal) {
+    background: #bbdefb;
+    border-color: #1565c0;
+    transform: scale(1.08);
+    z-index: 2;
+  }
+
+  /* 범례 */
+  .legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #5a6a8a;
+  }
+  .legend-dot {
+    width: 14px; height: 14px;
+    border-radius: 4px;
+    border: 1.5px solid;
+  }
+
+  /* 선택 상태 */
+  .selection-row {
+    display: flex;
+    gap: 12px;
+    max-width: 860px;
+    margin: 0 auto 1.2rem;
+    align-items: stretch;
+  }
+  .sel-card {
+    flex: 1;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+  }
+  .sel-badge {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px;
+    flex-shrink: 0;
+  }
+  .sel-badge.metal-bg { background: #fff3e0; color: #7a3500; border: 1.5px solid #ffcc80; }
+  .sel-badge.nonmetal-bg { background: #e3f2fd; color: #0d47a1; border: 1.5px solid #90caf9; }
+  .sel-badge.empty-bg { background: #f5f5f5; color: #bbb; border: 1.5px dashed #ccc; font-size: 20px; }
+  .sel-info { flex: 1; }
+  .sel-label { font-size: 11px; color: #9aabca; margin-bottom: 2px; }
+  .sel-name { font-size: 14px; font-weight: 600; color: #1a2a4a; }
+  .sel-ion { font-size: 12px; color: #6a7a9a; }
+  .arrow-center {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #c0c8da; flex-shrink: 0;
+    padding-top: 4px;
+  }
+  .btn-result {
+    display: block;
+    max-width: 860px;
+    margin: 0 auto 1.2rem;
+    width: 100%;
+    padding: 13px;
+    background: #1a3a6b;
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+    letter-spacing: -0.3px;
+  }
+  .btn-result:hover { background: #2a5aaa; }
+  .btn-result:disabled { background: #c0c8da; cursor: not-allowed; }
+
+  /* 결과 패널 */
+  .result-panel {
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    padding: 1.5rem;
+    max-width: 860px;
+    margin: 0 auto;
+    display: none;
+  }
+  .result-panel.show { display: block; }
+  .result-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a2a4a;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  /* 이온 결합 시각화 */
+  .bond-visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 1.2rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .atom-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .atom-label {
+    font-size: 12px;
+    color: #7a8aaa;
+  }
+  .ion-arrow {
+    font-size: 28px;
+    color: #c0c8da;
+    margin: 0 4px;
+    align-self: center;
+  }
+  .plus-sign {
+    font-size: 22px;
+    color: #c0c8da;
+    align-self: center;
+    margin: 0 2px;
+    padding-bottom: 18px;
+  }
+  .bracket-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .bracket {
+    font-size: 52px;
+    color: #1a2a4a;
+    line-height: 1;
+    font-weight: 300;
+  }
+  .ion-charge {
+    font-size: 13px;
+    font-weight: 700;
+    align-self: flex-start;
+    margin-top: 4px;
+  }
+  .ion-charge.pos { color: #e65100; }
+  .ion-charge.neg { color: #1565c0; }
+
+  /* 전자 배치 캔버스 */
+  .atoms-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+  }
+  .atom-canvas-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .atom-canvas-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #3a4a6a;
+  }
+  .arrow-down {
+    font-size: 20px;
+    color: #c0c8da;
+    text-align: center;
+    margin: -4px 0;
+  }
+
+  /* 결합 정보 */
+  .bond-info {
+    background: #f0f4fa;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .info-item { }
+  .info-item .lbl { font-size: 11px; color: #7a8aaa; margin-bottom: 2px; }
+  .info-item .val { font-size: 14px; font-weight: 600; color: #1a2a4a; }
+
+  .formula-big {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: #1a2a4a;
+    margin-bottom: 1rem;
+    letter-spacing: 1px;
+  }
+  .formula-name {
+    text-align: center;
+    font-size: 14px;
+    color: #6a7a9a;
+    margin-top: -8px;
+    margin-bottom: 1rem;
+  }
+
+  .reset-btn {
+    display: block;
+    margin: 1rem auto 0;
+    padding: 8px 24px;
+    background: transparent;
+    border: 1.5px solid #c0c8da;
+    border-radius: 20px;
+    font-size: 13px;
+    color: #6a7a9a;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .reset-btn:hover { border-color: #3a4a6a; color: #1a2a4a; }
+
+  @media (max-width: 600px) {
+    .el-cell .el-sym { font-size: 9px; }
+    .el-cell .el-num { font-size: 7px; }
+    .bond-info { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>⚡ 이온 결합 시뮬레이터</h1>
+<p class="subtitle">금속 원소 1개 + 비금속 원소 1개를 선택하면 이온 결합을 시각화합니다.</p>
+
+<!-- 주기율표 -->
+<div class="table-section">
+  <div class="table-title">주기율표 (1~20번) — 금속(주황) 또는 비금속(파랑)을 각각 1개씩 선택하세요</div>
+  <div class="periodic-grid" id="periodic-grid"></div>
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#fff3e0;border-color:#ffcc80;"></div> 금속 (양이온)
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#e3f2fd;border-color:#90caf9;"></div> 비금속 (음이온)
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f3e5f5;border-color:#ce93d8;"></div> 비활성 기체 (선택 불가)
+    </div>
+  </div>
+</div>
+
+<!-- 선택 상태 -->
+<div class="selection-row">
+  <div class="sel-card">
+    <div class="sel-badge empty-bg" id="metal-badge">+</div>
+    <div class="sel-info">
+      <div class="sel-label">금속 원소 (양이온)</div>
+      <div class="sel-name" id="metal-name">선택 안 됨</div>
+      <div class="sel-ion" id="metal-ion"></div>
+    </div>
+  </div>
+  <div class="arrow-center">+</div>
+  <div class="sel-card">
+    <div class="sel-badge empty-bg" id="nonmetal-badge">+</div>
+    <div class="sel-info">
+      <div class="sel-label">비금속 원소 (음이온)</div>
+      <div class="sel-name" id="nonmetal-name">선택 안 됨</div>
+      <div class="sel-ion" id="nonmetal-ion"></div>
+    </div>
+  </div>
+</div>
+
+<button class="btn-result" id="btn-simulate" disabled onclick="simulate()">이온 결합 시뮬레이션 →</button>
+
+<!-- 결과 패널 -->
+<div class="result-panel" id="result-panel">
+  <div class="formula-big" id="formula-big"></div>
+  <div class="formula-name" id="formula-name"></div>
+
+  <div class="result-title">전자 배치 변화</div>
+  <div class="atoms-row" id="atoms-row"></div>
+
+  <div class="bond-info" id="bond-info"></div>
+
+  <button class="reset-btn" onclick="reset()">↺ 다시 선택</button>
+</div>
+
+<script>
+// 1~20번 원소 데이터
+// type: 'metal' | 'nonmetal' | 'noble' | 'empty'
+// ion: 이온화 후 전하, valence: 원자가전자 수
+const ELEMENTS = [
+  // Z, sym, name, type, ionCharge, col(1-based), period
+  {z:1,  sym:'H',  name:'수소',     type:'nonmetal', ion:-1, period:1, col:1},
+  {z:2,  sym:'He', name:'헬륨',     type:'noble',    ion:0,  period:1, col:18},
+  {z:3,  sym:'Li', name:'리튬',     type:'metal',    ion:+1, period:2, col:1},
+  {z:4,  sym:'Be', name:'베릴륨',   type:'metal',    ion:+2, period:2, col:2},
+  {z:5,  sym:'B',  name:'붕소',     type:'metal',    ion:+3, period:2, col:13},
+  {z:6,  sym:'C',  name:'탄소',     type:'nonmetal', ion:0,  period:2, col:14}, // 이온결합 안함
+  {z:7,  sym:'N',  name:'질소',     type:'nonmetal', ion:-3, period:2, col:15},
+  {z:8,  sym:'O',  name:'산소',     type:'nonmetal', ion:-2, period:2, col:16},
+  {z:9,  sym:'F',  name:'플루오린', type:'nonmetal', ion:-1, period:2, col:17},
+  {z:10, sym:'Ne', name:'네온',     type:'noble',    ion:0,  period:2, col:18},
+  {z:11, sym:'Na', name:'나트륨',   type:'metal',    ion:+1, period:3, col:1},
+  {z:12, sym:'Mg', name:'마그네슘', type:'metal',    ion:+2, period:3, col:2},
+  {z:13, sym:'Al', name:'알루미늄', type:'metal',    ion:+3, period:3, col:13},
+  {z:14, sym:'Si', name:'규소',     type:'nonmetal', ion:0,  period:3, col:14}, // 이온결합 안함
+  {z:15, sym:'P',  name:'인',       type:'nonmetal', ion:-3, period:3, col:15},
+  {z:16, sym:'S',  name:'황',       type:'nonmetal', ion:-2, period:3, col:16},
+  {z:17, sym:'Cl', name:'염소',     type:'nonmetal', ion:-1, period:3, col:17},
+  {z:18, sym:'Ar', name:'아르곤',   type:'noble',    ion:0,  period:3, col:18},
+  {z:19, sym:'K',  name:'칼륨',     type:'metal',    ion:+1, period:4, col:1},
+  {z:20, sym:'Ca', name:'칼슘',     type:'metal',    ion:+2, period:4, col:2},
+];
+
+// 이온결합 가능한 원소만 (ion !== 0)
+const BONDABLE = ELEMENTS.filter(e => e.ion !== 0);
+const METALS = ELEMENTS.filter(e => e.type === 'metal');
+const NONMETALS = ELEMENTS.filter(e => e.type === 'nonmetal' && e.ion !== 0);
+
+let selectedMetal = null;
+let selectedNonmetal = null;
+
+// 전자껍질 최대
+const MAX_E = [2, 8, 8, 8];
+const SHELL_R = [28, 52, 76, 102];
+const SHELL_NAMES = ['K','L','M','N'];
+
+function distributeElectrons(total) {
+  let shells = [], rem = total;
+  for (let i = 0; i < 4; i++) {
+    if (rem <= 0) break;
+    let n = Math.min(rem, MAX_E[i]);
+    shells.push(n);
+    rem -= n;
+  }
+  return shells;
+}
+
+function superscript(n) {
+  const map = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸'};
+  return String(Math.abs(n)).split('').map(c => map[c]||c).join('');
+}
+
+function ionNotation(el) {
+  if (el.ion === 0) return el.sym;
+  const sign = el.ion > 0 ? '⁺' : '⁻';
+  const mag = Math.abs(el.ion);
+  return el.sym + (mag === 1 ? sign : superscript(mag) + sign);
+}
+
+// 주기율표 렌더링
+function buildPeriodicTable() {
+  const grid = document.getElementById('periodic-grid');
+  // 18열 x 4행 그리드
+  const cells = Array(4 * 18).fill(null);
+
+  ELEMENTS.forEach(el => {
+    const row = el.period - 1;
+    const col = el.col - 1;
+    cells[row * 18 + col] = el;
+  });
+
+  cells.forEach((el, i) => {
+    const div = document.createElement('div');
+    if (!el) {
+      div.className = 'el-cell empty';
+    } else {
+      const isBondable = el.ion !== 0;
+      const isNoble = el.type === 'noble';
+      div.className = 'el-cell ' + (isNoble ? 'noble' : el.type);
+      if (isNoble || !isBondable) div.classList.add('disabled');
+
+      div.innerHTML = `<span class="el-num">${el.z}</span><span class="el-sym">${el.sym}</span>`;
+      div.dataset.z = el.z;
+
+      if (!isNoble && isBondable) {
+        div.onclick = () => selectElement(el);
+      } else if (!isBondable && el.type !== 'noble') {
+        div.classList.add('disabled');
+        div.title = el.sym + '은(는) 고등학교 수준에서 이온결합을 하지 않습니다.';
+      }
+    }
+    grid.appendChild(div);
+  });
+}
+
+function selectElement(el) {
+  if (el.type === 'metal') {
+    // 금속 선택
+    if (selectedMetal && selectedMetal.z === el.z) {
+      // 취소
+      selectedMetal = null;
+    } else {
+      selectedMetal = el;
+    }
+  } else if (el.type === 'nonmetal') {
+    if (selectedNonmetal && selectedNonmetal.z === el.z) {
+      selectedNonmetal = null;
+    } else {
+      selectedNonmetal = el;
+    }
+  }
+  updateUI();
+}
+
+function updateUI() {
+  // 셀 스타일 업데이트
+  document.querySelectorAll('.el-cell').forEach(cell => {
+    const z = parseInt(cell.dataset.z);
+    if (!z) return;
+    const el = ELEMENTS[z - 1];
+    cell.classList.remove('selected-metal', 'selected-nonmetal');
+    if (selectedMetal && selectedMetal.z === z) cell.classList.add('selected-metal');
+    if (selectedNonmetal && selectedNonmetal.z === z) cell.classList.add('selected-nonmetal');
+  });
+
+  // 선택 카드 업데이트
+  const mb = document.getElementById('metal-badge');
+  const nb = document.getElementById('nonmetal-badge');
+
+  if (selectedMetal) {
+    mb.className = 'sel-badge metal-bg';
+    mb.textContent = selectedMetal.sym;
+    document.getElementById('metal-name').textContent = selectedMetal.name + ' (' + selectedMetal.sym + ')';
+    document.getElementById('metal-ion').textContent = '→ ' + ionNotation(selectedMetal) + ' (전자 ' + selectedMetal.ion + '개 잃음)';
+  } else {
+    mb.className = 'sel-badge empty-bg';
+    mb.textContent = '+';
+    document.getElementById('metal-name').textContent = '선택 안 됨';
+    document.getElementById('metal-ion').textContent = '';
+  }
+
+  if (selectedNonmetal) {
+    nb.className = 'sel-badge nonmetal-bg';
+    nb.textContent = selectedNonmetal.sym;
+    document.getElementById('nonmetal-name').textContent = selectedNonmetal.name + ' (' + selectedNonmetal.sym + ')';
+    document.getElementById('nonmetal-ion').textContent = '→ ' + ionNotation(selectedNonmetal) + ' (전자 ' + Math.abs(selectedNonmetal.ion) + '개 얻음)';
+  } else {
+    nb.className = 'sel-badge empty-bg';
+    nb.textContent = '+';
+    document.getElementById('nonmetal-name').textContent = '선택 안 됨';
+    document.getElementById('nonmetal-ion').textContent = '';
+  }
+
+  document.getElementById('btn-simulate').disabled = !(selectedMetal && selectedNonmetal);
+  document.getElementById('result-panel').classList.remove('show');
+}
+
+// 최소공배수
+function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+function lcm(a, b) { return a * b / gcd(a, b); }
+
+function drawAtom(canvas, protons, electrons, highlight) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W, H);
+
+  const shells = distributeElectrons(electrons);
+
+  // 궤도
+  for (let i = 0; i < shells.length; i++) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, SHELL_R[i], 0, Math.PI * 2);
+    ctx.strokeStyle = '#1a3a6b';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // 전자
+  for (let s = 0; s < shells.length; s++) {
+    const n = shells[s];
+    const r = SHELL_R[s];
+    for (let e = 0; e < n; e++) {
+      const angle = (2 * Math.PI * e / n) - Math.PI / 2;
+      const ex = cx + r * Math.cos(angle);
+      const ey = cy + r * Math.sin(angle);
+      ctx.beginPath();
+      ctx.arc(ex, ey, 7, 0, Math.PI * 2);
+      ctx.fillStyle = highlight === 'metal' ? '#2a75d0' : '#1565c0';
+      ctx.fill();
+      ctx.strokeStyle = '#0d47a1';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('−', ex, ey);
+    }
+  }
+
+  // 핵
+  ctx.beginPath();
+  ctx.arc(cx, cy, 18, 0, Math.PI * 2);
+  ctx.fillStyle = '#e03010';
+  ctx.fill();
+  ctx.strokeStyle = '#a02008';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(protons + '+', cx, cy);
+}
+
+function ionName(compound) {
+  // 주요 이온 화합물 이름 매핑
+  const names = {
+    'LiF':'플루오린화 리튬','LiCl':'염화 리튬','Li2O':'산화 리튬','Li3N':'질화 리튬','Li2S':'황화 리튬','Li3P':'인화 리튬',
+    'NaF':'플루오린화 나트륨','NaCl':'염화 나트륨','Na2O':'산화 나트륨','Na3N':'질화 나트륨','Na2S':'황화 나트륨','Na3P':'인화 나트륨',
+    'KF':'플루오린화 칼륨','KCl':'염화 칼륨','K2O':'산화 칼륨','K3N':'질화 칼륨','K2S':'황화 칼륨','K3P':'인화 칼륨',
+    'BeF2':'플루오린화 베릴륨','BeCl2':'염화 베릴륨','BeO':'산화 베릴륨','Be3N2':'질화 베릴륨','BeS':'황화 베릴륨','Be3P2':'인화 베릴륨',
+    'MgF2':'플루오린화 마그네슘','MgCl2':'염화 마그네슘','MgO':'산화 마그네슘','Mg3N2':'질화 마그네슘','MgS':'황화 마그네슘','Mg3P2':'인화 마그네슘',
+    'CaF2':'플루오린화 칼슘','CaCl2':'염화 칼슘','CaO':'산화 칼슘','Ca3N2':'질화 칼슘','CaS':'황화 칼슘','Ca3P2':'인화 칼슘',
+    'AlF3':'플루오린화 알루미늄','AlCl3':'염화 알루미늄','Al2O3':'산화 알루미늄','AlN':'질화 알루미늄','Al2S3':'황화 알루미늄','AlP':'인화 알루미늄',
+    'BF3':'플루오린화 붕소','BCl3':'염화 붕소','B2O3':'산화 붕소','BN':'질화 붕소','B2S3':'황화 붕소','BP':'인화 붕소',
+  };
+  return names[compound] || '';
+}
+
+function simulate() {
+  const m = selectedMetal;
+  const nm = selectedNonmetal;
+  if (!m || !nm) return;
+
+  // 비율 계산 (최소 정수비)
+  const mIon = m.ion;       // 양수 (예: +2)
+  const nmIon = Math.abs(nm.ion); // 양수 (예: -1 → 1)
+  const L = lcm(mIon, nmIon);
+  const mCount = L / mIon;   // 금속 개수
+  const nmCount = L / nmIon; // 비금속 개수
+
+  // 화학식 (아래첨자 포함)
+  const formulaKey = m.sym + (mCount > 1 ? mCount : '') + nm.sym + (nmCount > 1 ? nmCount : '');
+  let formulaHTML = m.sym + (mCount > 1 ? '<sub>' + mCount + '</sub>' : '');
+  formulaHTML += nm.sym + (nmCount > 1 ? '<sub>' + nmCount + '</sub>' : '');
+
+  document.getElementById('formula-big').innerHTML = formulaHTML;
+  const fname = ionName(formulaKey);
+  document.getElementById('formula-name').textContent = fname ? '(' + fname + ')' : '';
+
+  // 전자 배치 캔버스 생성
+  const atomsRow = document.getElementById('atoms-row');
+  atomsRow.innerHTML = '';
+
+  const SIZE = 230;
+
+  // 금속 원자 → 이온
+  const mWrap = document.createElement('div');
+  mWrap.className = 'atom-canvas-wrap';
+
+  const mCanvas1 = document.createElement('canvas');
+  mCanvas1.width = SIZE; mCanvas1.height = SIZE;
+  mCanvas1.style.borderRadius = '10px';
+  mCanvas1.style.border = '1px solid #ffe0b2';
+  drawAtom(mCanvas1, m.z, m.z, 'metal');
+  const mLbl1 = document.createElement('div');
+  mLbl1.className = 'atom-canvas-label';
+  mLbl1.style.color = '#e65100';
+  mLbl1.textContent = m.sym + ' 원자 (전자 ' + m.z + '개)';
+
+  const mArrow = document.createElement('div');
+  mArrow.className = 'arrow-down';
+  mArrow.innerHTML = '↓ <span style="font-size:12px;color:#e65100;font-weight:600;">전자 ' + mIon + '개 잃음</span>';
+
+  const mCanvas2 = document.createElement('canvas');
+  mCanvas2.width = SIZE; mCanvas2.height = SIZE;
+  mCanvas2.style.borderRadius = '10px';
+  mCanvas2.style.border = '2px solid #e65100';
+  drawAtom(mCanvas2, m.z, m.z - mIon, 'metal');
+  const mLbl2 = document.createElement('div');
+  mLbl2.className = 'atom-canvas-label';
+  mLbl2.style.color = '#e65100';
+  mLbl2.textContent = ionNotation(m) + ' (전자 ' + (m.z - mIon) + '개)';
+
+  mWrap.appendChild(mLbl1);
+  mWrap.appendChild(mCanvas1);
+  mWrap.appendChild(mArrow);
+  mWrap.appendChild(mCanvas2);
+  mWrap.appendChild(mLbl2);
+
+  // 비금속 원자 → 이온
+  const nmWrap = document.createElement('div');
+  nmWrap.className = 'atom-canvas-wrap';
+
+  const nmCanvas1 = document.createElement('canvas');
+  nmCanvas1.width = SIZE; nmCanvas1.height = SIZE;
+  nmCanvas1.style.borderRadius = '10px';
+  nmCanvas1.style.border = '1px solid #bbdefb';
+  drawAtom(nmCanvas1, nm.z, nm.z, 'nonmetal');
+  const nmLbl1 = document.createElement('div');
+  nmLbl1.className = 'atom-canvas-label';
+  nmLbl1.style.color = '#1565c0';
+  nmLbl1.textContent = nm.sym + ' 원자 (전자 ' + nm.z + '개)';
+
+  const nmArrow = document.createElement('div');
+  nmArrow.className = 'arrow-down';
+  nmArrow.innerHTML = '↓ <span style="font-size:12px;color:#1565c0;font-weight:600;">전자 ' + nmIon + '개 얻음</span>';
+
+  const nmCanvas2 = document.createElement('canvas');
+  nmCanvas2.width = SIZE; nmCanvas2.height = SIZE;
+  nmCanvas2.style.borderRadius = '10px';
+  nmCanvas2.style.border = '2px solid #1565c0';
+  drawAtom(nmCanvas2, nm.z, nm.z + nmIon, 'nonmetal');
+  const nmLbl2 = document.createElement('div');
+  nmLbl2.className = 'atom-canvas-label';
+  nmLbl2.style.color = '#1565c0';
+  nmLbl2.textContent = ionNotation(nm) + ' (전자 ' + (nm.z + nmIon) + '개)';
+
+  nmWrap.appendChild(nmLbl1);
+  nmWrap.appendChild(nmCanvas1);
+  nmWrap.appendChild(nmArrow);
+  nmWrap.appendChild(nmCanvas2);
+  nmWrap.appendChild(nmLbl2);
+
+  atomsRow.appendChild(mWrap);
+  atomsRow.appendChild(nmWrap);
+
+  // 정전기적 인력 시각화
+  const attractionDiv = document.createElement('div');
+  attractionDiv.style.cssText = 'text-align:center;margin:0.5rem 0 1.2rem;';
+
+  const mIonSym = ionNotation(m);
+  const nmIonSym = ionNotation(nm);
+  const mColor = '#e65100';
+  const nmColor = '#1565c0';
+
+  attractionDiv.innerHTML = `
+    <div style="font-size:13px;font-weight:600;color:#3a4a6a;margin-bottom:10px;">정전기적 인력에 의한 이온 결합</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;">
+      <div style="width:56px;height:56px;border-radius:50%;background:#fff3e0;border:2.5px solid ${mColor};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:${mColor};">${mIonSym}</div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+        <div style="font-size:11px;color:#e65100;font-weight:600;">(+)</div>
+        <div style="display:flex;align-items:center;gap:2px;">
+          <span style="font-size:20px;color:#e65100;">←</span>
+          <span style="font-size:12px;font-weight:700;color:#555;background:#f0f4fa;border-radius:20px;padding:3px 10px;">정전기적 인력</span>
+          <span style="font-size:20px;color:#1565c0;">→</span>
+        </div>
+        <div style="font-size:11px;color:#1565c0;font-weight:600;">(-)</div>
+      </div>
+      <div style="width:56px;height:56px;border-radius:50%;background:#e3f2fd;border:2.5px solid ${nmColor};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:${nmColor};">${nmIonSym}</div>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:#555;background:#f8f9ff;border-radius:10px;padding:8px 14px;display:inline-block;">
+      양이온(${mIonSym})과 음이온(${nmIonSym}) 사이의 <strong>정전기적 인력</strong>으로 결합
+    </div>
+  `;
+  document.getElementById('atoms-row').after(attractionDiv);
+
+  // 결합 정보
+  const mIonElec = m.z - mIon;
+  const nmIonElec = nm.z + nmIon;
+  const mShells = distributeElectrons(mIonElec);
+  const nmShells = distributeElectrons(nmIonElec);
+
+  document.getElementById('bond-info').innerHTML = `
+    <div class="info-item">
+      <div class="lbl">화학식</div>
+      <div class="val">${formulaHTML}</div>
+    </div>
+    <div class="info-item">
+      <div class="lbl">결합 비율 (금속 : 비금속)</div>
+      <div class="val">${mCount} : ${nmCount}</div>
+    </div>
+    <div class="info-item">
+      <div class="lbl">${ionNotation(m)} 전자 배치</div>
+      <div class="val">${mShells.map((n,i)=>SHELL_NAMES[i]+'('+n+')').join(' - ')}</div>
+    </div>
+    <div class="info-item">
+      <div class="lbl">${ionNotation(nm)} 전자 배치</div>
+      <div class="val">${nmShells.map((n,i)=>SHELL_NAMES[i]+'('+n+')').join(' - ')}</div>
+    </div>
+    <div class="info-item">
+      <div class="lbl">${m.sym} 이온화: 전자 이동</div>
+      <div class="val">전자 ${mIon}개 → 비금속으로</div>
+    </div>
+    <div class="info-item">
+      <div class="lbl">결합 특성</div>
+      <div class="val">이온 결합 (정전기적 인력)</div>
+    </div>
+  `;
+
+  document.getElementById('result-panel').classList.add('show');
+  document.getElementById('result-panel').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function reset() {
+  selectedMetal = null;
+  selectedNonmetal = null;
+  updateUI();
+  document.getElementById('result-panel').classList.remove('show');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+buildPeriodicTable();
+updateUI();
+</script>
+</body>
+</html>
