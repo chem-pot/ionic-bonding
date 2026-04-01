@@ -763,6 +763,10 @@ function simulate() {
       양이온(${mIonSym})과 음이온(${nmIonSym}) 사이의 <strong>정전기적 인력</strong>으로 결합
     </div>
   `;
+  // 기존 attractionDiv 제거 후 삽입
+  const oldAttraction = document.getElementById('attraction-div');
+  if (oldAttraction) oldAttraction.remove();
+  attractionDiv.id = 'attraction-div';
   document.getElementById('atoms-row').after(attractionDiv);
 
   // 결합 정보
